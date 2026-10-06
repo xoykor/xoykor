@@ -19,9 +19,9 @@ ARMS = [
     ((-0.85, -0.52), (670, 82),  0.75, 'wrap_top'),
     ((-1.00, -0.03), (625, 220), 2.15, 'wrap_side'),
     ((-0.82,  0.55), (682, 380), 3.50, 'wrap_bottom'),
-    (( 0.80, -0.55), (1078, 76), 4.10, 'free'),
-    (( 1.00,  0.02), (1125, 222), 5.20, 'free'),
-    (( 0.80,  0.56), (1062, 384), 0.10, 'free'),
+    (( 0.80, -0.55), (1078, 76), 4.10, 'book'),
+    (( 0.95, -0.18), (1125, 222), 5.20, 'screw_tux'),
+    (( 0.80,  0.56), (1062, 384), 0.10, 'bulb'),
 ]
 CENTER = (878, 230)
 
@@ -42,20 +42,57 @@ def arm_svg(frame, spec, alert):
     elif behavior == 'wrap_bottom':
         theta = pi / 2 + .46 * sin(cycle)
         ex, ey = 320 + 86 * cos(theta), 280 + 130 * sin(theta)
+    elif behavior == 'book':
+        ex, ey = 1078 + 5 * sin(cycle), 76 + 9 * cos(cycle)
+    elif behavior == 'screw_tux':
+        reach = .5 - .5 * cos(2 * pi * frame / FRAME_COUNT)
+        ex, ey = 548 - 28 * reach, 246 + 20 * sin(cycle)
+    elif behavior == 'bulb':
+        ex, ey = 1062 + 7 * sin(cycle), 384 + 8 * cos(cycle)
     bend = (38 if behavior.startswith('wrap_') else 28) * wave
-    c1x, c1y = sx + (ex - sx) * .34 + nx * bend, sy + (ey - sy) * .34 + ny * bend
-    c2x, c2y = sx + (ex - sx) * .72 - nx * 20 * wave2, sy + (ey - sy) * .72 - ny * 20 * wave2
+    if behavior == 'screw_tux':
+        c1x, c1y = sx + 73, sy - 92 + 16 * wave
+        c2x, c2y = ex + 224, 94 + 22 * wave2
+    else:
+        c1x, c1y = sx + (ex - sx) * .34 + nx * bend, sy + (ey - sy) * .34 + ny * bend
+        c2x, c2y = sx + (ex - sx) * .72 - nx * 20 * wave2, sy + (ey - sy) * .72 - ny * 20 * wave2
     d = f'M {sx:.1f} {sy:.1f} C {c1x:.1f} {c1y:.1f}, {c2x:.1f} {c2y:.1f}, {ex:.1f} {ey:.1f}'
     angle = degrees(atan2(ey - c2y, ex - c2x))
     dash = (frame * 1.7 + phase * 8) % 22
     accent = '#ff4d63' if alert else '#49dce1'
     claw = '#ff99a6' if alert else '#9beee8'
+    if behavior == 'book':
+        prop = '''
+          <g transform="translate(25 -20) rotate(-12)">
+            <path d="M8 2Q0 -2 -10 1V30Q0 27 8 32Z" fill="#e9c98b" stroke="#f6e4bd" stroke-width="2"/>
+            <path d="M8 2Q18 -2 29 1V30Q18 27 8 32Z" fill="#fff1d1" stroke="#f6e4bd" stroke-width="2"/>
+            <path d="M8 2V32" stroke="#8e6540" stroke-width="2"/>
+            <path d="M-5 8L4 10M-5 14L4 16M13 9L23 7M13 15L23 13" stroke="#9b8a70" stroke-width="1.4" stroke-linecap="round"/>
+          </g>'''
+    elif behavior == 'screw_tux':
+        prop = '''
+          <g transform="translate(21 0)">
+            <rect x="0" y="-7" width="27" height="14" rx="6" fill="#e96856" stroke="#ffb49d" stroke-width="2"/>
+            <path d="M27 0H69" stroke="#dbe5eb" stroke-width="5" stroke-linecap="round"/>
+            <path d="M68 -5V5" stroke="#8fa5b2" stroke-width="3" stroke-linecap="round"/>
+            <path d="M8 -4V4" stroke="#9a3b38" stroke-width="1.5"/>
+          </g>'''
+    elif behavior == 'bulb':
+        prop = '''
+          <g transform="translate(27 -8)">
+            <path d="M0 9A13 13 0 1 1 24 9C21 13 19 16 19 20H5C5 16 3 13 0 9Z" fill="#ffdf79" stroke="#fff0bb" stroke-width="2"/>
+            <path d="M7 22H17M8 26H16M10 30H14" stroke="#aabac2" stroke-width="3" stroke-linecap="round"/>
+            <path d="M8 5Q11 1 15 4" fill="none" stroke="#fff9e4" stroke-width="2" stroke-linecap="round"/>
+          </g>'''
+    else:
+        prop = ''
     return f'''
       <path d="{d}" fill="none" stroke="#07121e" stroke-width="28" stroke-linecap="round"/>
       <path d="{d}" fill="none" stroke="#284458" stroke-width="20" stroke-linecap="round"/>
       <path d="{d}" fill="none" stroke="url(#metal)" stroke-width="13" stroke-linecap="round" stroke-dasharray="10 8" stroke-dashoffset="-{dash:.1f}"/>
       <path d="{d}" fill="none" stroke="#d3e1e9" stroke-opacity=".62" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 15" stroke-dashoffset="-{dash:.1f}"/>
       <g transform="translate({ex:.1f} {ey:.1f}) rotate({angle:.1f})">
+        {prop}
         <circle r="13" fill="#172b3a" stroke="#a9bfcd" stroke-width="3"/>
         <circle r="5" fill="{accent}"/>
         <path d="M 7 -4 L 22 -15 M 8 0 L 26 0 M 7 4 L 22 15" fill="none" stroke="{claw}" stroke-width="3.5" stroke-linecap="round"/>
@@ -113,16 +150,17 @@ def make_svg(frame=0):
         <circle cx="878" cy="148" r="5" fill="{accent}"/><circle cx="960" cy="230" r="5" fill="{accent}"/>
         <circle cx="878" cy="312" r="5" fill="{accent}"/><circle cx="796" cy="230" r="5" fill="{accent}"/>
       </g>
-      <path d="M1012 406H1150" stroke="#254455"/><text x="1016" y="425" fill="#658295" font-family="Arial, sans-serif" font-size="10" letter-spacing="2">APRENDER · EXPLORAR</text>
     </svg>'''
 
 
 def main():
-    (ASSETS / 'profile-banner.svg').write_text(make_svg(0), encoding='utf-8')
+    FRAMES_DIR.mkdir(parents=True, exist_ok=True)
+    clean_svg = lambda frame: '\n'.join(line.rstrip() for line in make_svg(frame).splitlines()) + '\n'
+    (ASSETS / 'profile-banner.svg').write_text(clean_svg(0), encoding='utf-8')
     for i in range(FRAME_COUNT):
         svg = FRAMES_DIR / f'frame-{i:02d}.svg'
         png = FRAMES_DIR / f'frame-{i:02d}.png'
-        svg.write_text(make_svg(i), encoding='utf-8')
+        svg.write_text(clean_svg(i), encoding='utf-8')
         subprocess.run(['rsvg-convert', '-w', str(WIDTH), '-h', str(HEIGHT), str(svg), '-o', str(png)], check=True)
     frames = [Image.open(FRAMES_DIR / f'frame-{i:02d}.png').convert('RGB').convert('P', palette=Image.Palette.ADAPTIVE, colors=128) for i in range(FRAME_COUNT)]
     frames[0].save(ASSETS / 'profile-banner.gif', save_all=True, append_images=frames[1:], duration=DURATION_MS, loop=0, optimize=True, disposal=2)
