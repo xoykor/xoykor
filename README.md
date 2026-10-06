@@ -6,6 +6,7 @@
   <h1>Fernando Victor Oliveira de Araujo</h1>
   <p><strong>Graduando em Bacharelado em Ciência e Tecnologia na Universidade Federal do Rio Grande do Norte (UFRN)</strong></p>
   <p>Estou explorando diferentes áreas da tecnologia enquanto construo minha formação, aprendendo e criando projetos.</p>
+  <p>🤗 <a href="https://huggingface.co/xoykor">Hugging Face</a></p>
 </div>
 
 ---
