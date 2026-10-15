@@ -6,7 +6,7 @@
 
 <div align="center">
   <a href="https://huggingface.co/xoykor">
-    <img src="https://img.shields.io/badge/Hugging_Face-xoykor-07101E?style=for-the-badge&logo=huggingface&logoColor=00E5FF&labelColor=04070D" alt="Hugging Face" />
+    <img src="https://img.shields.io/badge/Hugging_Face-xoykor-07101E?style=for-the-badge&logo=huggingface&logoColor=FFD21E&labelColor=04070D" alt="Hugging Face" />
   </a>
 </div>
 
