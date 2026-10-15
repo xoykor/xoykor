@@ -2,7 +2,7 @@
 """
 Gerador do Banner Exuberante Animado para o GitHub Profile (xoykor)
 Lê assets/tux.svg e gera:
-  - assets/profile-banner.gif (Banner animado com tentáculos em movimento suave)
+  - assets/profile-banner.gif (Banner animado com tentáculos em movimento e modo Alerta Vermelho)
   - assets/profile-banner.svg (Versão vetorial do frame base)
   - assets/profile-banner.png (Preview estático em alta resolução)
 """
@@ -63,6 +63,8 @@ def build_tentacle(
     thickness: float = 20,
     opacity: float = 1.0,
     pulse_offset: float = 0.0,
+    energy_color: str = "#00e5ff",
+    energy_glow: str = "url(#cyanGlow)",
 ) -> str:
     """Gera o corpo do tentáculo mecânico segmentado com sombra, relevo e pulso neon."""
     path_d = f"M {p0[0]:.1f},{p0[1]:.1f} C {p1[0]:.1f},{p1[1]:.1f} {p2[0]:.1f},{p2[1]:.1f} {p3[0]:.1f},{p3[1]:.1f}"
@@ -94,8 +96,8 @@ def build_tentacle(
         <path d="{path_d}" fill="none" stroke="#0b1729" stroke-width="{thickness}" stroke-linecap="butt" stroke-dasharray="4 22" />
         <!-- Trilha interna escura -->
         <path d="{path_d}" fill="none" stroke="#10233f" stroke-width="{thickness * 0.35:.1f}" stroke-linecap="round" />
-        <!-- Feixe de energia ciano pulsante -->
-        <path d="{path_d}" fill="none" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="14 90" stroke-dashoffset="-{pulse_offset:.1f}" filter="url(#cyanGlow)" />
+        <!-- Feixe de energia neon pulsante -->
+        <path d="{path_d}" fill="none" stroke="{energy_color}" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="14 90" stroke-dashoffset="-{pulse_offset:.1f}" filter="{energy_glow}" />
         <!-- Pontos de reflexo metálico calculados dinamicamente na curva -->
         {highlights_svg}
       </g>
@@ -109,24 +111,26 @@ def build_claw(
     scale: float = 1.0,
     tool: str = "none",
     tool_anim: float = 0.0,
+    accent_color: str = "#00e5ff",
+    accent_glow: str = "url(#cyanGlowSubtle)",
 ) -> str:
     """Desenha a garra robótica articulada e a ferramenta acoplada na ponta."""
     tool_svg = ""
     if tool == "screwdriver":
         # Chave de fenda amarela com faíscas animadas
-        spark_r = 2.2 + 1.2 * math.sin(tool_anim)
-        spark_op = 0.4 + 0.6 * math.sin(tool_anim) ** 2
+        spark_r = 2.4 + 1.4 * math.sin(tool_anim * 2)
+        spark_op = 0.5 + 0.5 * math.sin(tool_anim * 2) ** 2
         tool_svg = f"""
         <g transform="rotate(15) translate(16, 0)">
           <!-- Haste metálica -->
           <rect x="28" y="-2.2" width="38" height="4.4" rx="1.5" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.5" />
-          <polygon points="66,-2.2 75,-0.8 75,0.8 66,2.2" fill="#38bdf8" filter="url(#cyanGlow)" />
+          <polygon points="66,-2.2 75,-0.8 75,0.8 66,2.2" fill="{accent_color}" filter="{accent_glow}" />
           <!-- Cabo isolado amarelo/âmbar -->
           <rect x="0" y="-8" width="30" height="16" rx="5" fill="url(#screwdriverGrad)" stroke="#0f172a" stroke-width="2" />
           <line x1="8" y1="-5" x2="22" y2="-5" stroke="#fef08a" stroke-width="1.8" stroke-linecap="round" opacity="0.8" />
           <line x1="8" y1="0" x2="22" y2="0" stroke="#78350f" stroke-width="1.8" stroke-linecap="round" opacity="0.5" />
           <!-- Faíscas de energia na ponta -->
-          <circle cx="77" cy="0" r="{spark_r:.1f}" fill="#00e5ff" opacity="{spark_op:.2f}" filter="url(#cyanGlow)" />
+          <circle cx="77" cy="0" r="{spark_r:.1f}" fill="{accent_color}" opacity="{spark_op:.2f}" filter="{accent_glow}" />
         </g>
         """
     elif tool == "paper":
@@ -139,7 +143,7 @@ def build_claw(
           <!-- Linhas de código estilizadas -->
           <line x1="8" y1="9" x2="22" y2="7" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" />
           <line x1="10" y1="16" x2="31" y2="13" stroke="#334155" stroke-width="2" stroke-linecap="round" />
-          <line x1="11" y1="22" x2="27" y2="19" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" />
+          <line x1="11" y1="22" x2="27" y2="19" stroke="{accent_color}" stroke-width="2" stroke-linecap="round" />
           <line x1="13" y1="29" x2="33" y2="26" stroke="#334155" stroke-width="2" stroke-linecap="round" />
         </g>
         """
@@ -172,19 +176,45 @@ def build_claw(
         <path d="M 0,6 Q 14,20 26,12" fill="none" stroke="#64748b" stroke-width="4.5" stroke-linecap="round" />
         <path d="M 0,6 Q 14,20 26,12" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" />
         {tool_svg}
-        <!-- Articulação / Punho com anel neon -->
-        <circle cx="0" cy="0" r="12" fill="#091324" stroke="#00e5ff" stroke-width="2" filter="url(#cyanGlowSubtle)" />
-        <circle cx="0" cy="0" r="6" fill="#334155" stroke="#00e5ff" stroke-width="1.2" />
-        <circle cx="0" cy="0" r="2.2" fill="#00e5ff" />
+        <!-- Articulação / Punho com anel neon reativo -->
+        <circle cx="0" cy="0" r="12" fill="#091324" stroke="{accent_color}" stroke-width="2" filter="{accent_glow}" />
+        <circle cx="0" cy="0" r="6" fill="#334155" stroke="{accent_color}" stroke-width="1.2" />
+        <circle cx="0" cy="0" r="2.2" fill="{accent_color}" />
       </g>
     """
 
 
 def make_frame_svg(frame: int, tux_uri: str) -> str:
-    """Gera o código SVG para um frame específico com cinemática completa dos tentáculos."""
+    """Gera o código SVG para um frame específico com cinemática dos tentáculos e modo Alerta Vermelho."""
     # Coordenadas do Núcleo Robótico (Direita)
     cx, cy = 875, 255
     phase_base = 2 * math.pi * frame / FRAME_COUNT
+
+    # --- Modo de Alerta Vermelho (Frames 8 a 13: alcance máximo da chave de fenda) ---
+    is_alert = 8 <= frame <= 13
+
+    if is_alert:
+        # Paleta Neon Vermelha / Carmesim de Alerta
+        accent_color = "#ff2a55"
+        accent_glow = "url(#redGlow)"
+        accent_glow_subtle = "url(#redGlowSubtle)"
+        ring_color = "#ff3366"
+        crescent_color = "#ff2a55"
+        pupil_halo_color = "#ff0044"
+        pupil_halo_op = "0.45"
+        radar_alert_stroke = "#ef4444"
+        hud_alert_tag = '<tspan fill="#ff2a55" font-weight="700"> [SCAN.ALERT]</tspan>'
+    else:
+        # Paleta Neon Ciano / Azul padrão
+        accent_color = "#00e5ff"
+        accent_glow = "url(#cyanGlow)"
+        accent_glow_subtle = "url(#cyanGlowSubtle)"
+        ring_color = "#00e5ff"
+        crescent_color = "#38bdf8"
+        pupil_halo_color = "#00e5ff"
+        pupil_halo_op = "0.15"
+        radar_alert_stroke = "#00e5ff"
+        hud_alert_tag = ""
 
     # --- Ângulos de Rotação e Cinemática ---
     rot_cw = (frame / FRAME_COUNT) * 360.0
@@ -229,7 +259,7 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
 
     # 5. Tentáculo médio esquerdo (segurando a chave de fenda e alcançando o Tux)
     cyc5 = phase_base + 0.5
-    reach = 0.5 - 0.5 * math.cos(phase_base)  # Movimento de vai-e-vem fluido
+    reach = 0.5 - 0.5 * math.cos(phase_base)  # Movimento de vai-e-vem fluido (ápice nos frames 11-13)
     t5_p0 = (cx - 50, cy - 18)
     t5_p3 = (565 - 38 * reach, 265 + 18 * math.sin(cyc5))
     t5_p1 = (725 - 15 * reach + 18 * math.sin(cyc5), 200 + 12 * math.cos(cyc5))
@@ -243,21 +273,30 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
     t6_p2 = (505 - 18 * math.cos(cyc6), 395 + 16 * math.sin(cyc6))
 
     tentacles_specs = [
-        ("t-back-mid", t1_p0, t1_p1, t1_p2, t1_p3, 17, 0.60, (frame * 5.5 + 20) % 104, "none", cyc1),
-        ("t-top-right", t2_p0, t2_p1, t2_p2, t2_p3, 18, 0.90, (frame * 6.0 + 40) % 104, "paper", cyc2),
-        ("t-bot-right", t3_p0, t3_p1, t3_p2, t3_p3, 18, 0.90, (frame * 6.0 + 70) % 104, "bulb", cyc3),
-        ("t-top-left", t4_p0, t4_p1, t4_p2, t4_p3, 20, 0.95, (frame * 6.5 + 0) % 104, "none", cyc4),
-        ("t-mid-left", t5_p0, t5_p1, t5_p2, t5_p3, 19, 1.00, (frame * 7.0 + 50) % 104, "screwdriver", cyc5),
-        ("t-bot-left", t6_p0, t6_p1, t6_p2, t6_p3, 20, 1.00, (frame * 6.2 + 85) % 104, "none", cyc6),
+        ("t-back-mid", t1_p0, t1_p1, t1_p2, t1_p3, 17, 0.60, (frame * 5.5 + 20) % 104, "none", cyc1, "#00e5ff", "url(#cyanGlow)"),
+        ("t-top-right", t2_p0, t2_p1, t2_p2, t2_p3, 18, 0.90, (frame * 6.0 + 40) % 104, "paper", cyc2, "#00e5ff", "url(#cyanGlow)"),
+        ("t-bot-right", t3_p0, t3_p1, t3_p2, t3_p3, 18, 0.90, (frame * 6.0 + 70) % 104, "bulb", cyc3, "#00e5ff", "url(#cyanGlow)"),
+        ("t-top-left", t4_p0, t4_p1, t4_p2, t4_p3, 20, 0.95, (frame * 6.5 + 0) % 104, "none", cyc4, "#00e5ff", "url(#cyanGlow)"),
+        ("t-mid-left", t5_p0, t5_p1, t5_p2, t5_p3, 19, 1.00, (frame * 7.0 + 50) % 104, "screwdriver", cyc5, accent_color, accent_glow),
+        ("t-bot-left", t6_p0, t6_p1, t6_p2, t6_p3, 20, 1.00, (frame * 6.2 + 85) % 104, "none", cyc6, "#00e5ff", "url(#cyanGlow)"),
     ]
 
     back_tentacles_svg = []
     front_tentacles_svg = []
 
-    for tid, p0, p1, p2, p3, thick, opac, pulse_off, tool, anim_val in tentacles_specs:
-        t_svg = build_tentacle(tid, p0, p1, p2, p3, thick, opac, pulse_off)
+    for tid, p0, p1, p2, p3, thick, opac, pulse_off, tool, anim_val, en_col, en_glow in tentacles_specs:
+        t_svg = build_tentacle(tid, p0, p1, p2, p3, thick, opac, pulse_off, energy_color=en_col, energy_glow=en_glow)
         end_angle = bezier_tangent_angle(1.0, p0, p1, p2, p3)
-        c_svg = build_claw(p3[0], p3[1], end_angle, scale=0.95, tool=tool, tool_anim=anim_val)
+        c_svg = build_claw(
+            p3[0],
+            p3[1],
+            end_angle,
+            scale=0.95,
+            tool=tool,
+            tool_anim=anim_val,
+            accent_color=accent_color if (is_alert and tool == "screwdriver") else "#00e5ff",
+            accent_glow=accent_glow_subtle if (is_alert and tool == "screwdriver") else "url(#cyanGlowSubtle)",
+        )
         combined = t_svg + c_svg
         if tid == "t-back-mid":
             back_tentacles_svg.append(combined)
@@ -281,7 +320,7 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
 
     <!-- Halo Radial do Núcleo de IA -->
     <radialGradient id="coreAura" cx="73%" cy="53%" r="42%">
-      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.22" />
+      <stop offset="0%" stop-color="{accent_color}" stop-opacity="0.25" />
       <stop offset="45%" stop-color="#0284c7" stop-opacity="0.08" />
       <stop offset="100%" stop-color="#000000" stop-opacity="0" />
     </radialGradient>
@@ -324,7 +363,7 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
       <circle cx="40" cy="40" r="0.8" fill="#38bdf8" fill-opacity="0.22" />
     </pattern>
 
-    <!-- Filtros de Brilho Neon (Glow) -->
+    <!-- Filtros de Brilho Ciano Neon -->
     <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
       <feGaussianBlur stdDeviation="4" result="blur" />
       <feMerge>
@@ -334,6 +373,23 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
     </filter>
 
     <filter id="cyanGlowSubtle" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Filtros de Brilho Vermelho Neon (Modo Alerta) -->
+    <filter id="redGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="redGlowSubtle" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="2" result="blur" />
       <feMerge>
         <feMergeNode in="blur" />
@@ -368,12 +424,12 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
   <rect width="{WIDTH}" height="{HEIGHT}" rx="14" fill="url(#tuxAura)" />
 
   <!-- Moldura Externa HUD Sutil -->
-  <rect x="10" y="10" width="{WIDTH - 20}" height="{HEIGHT - 20}" rx="10" fill="none" stroke="#00e5ff" stroke-opacity="0.14" stroke-width="1" />
+  <rect x="10" y="10" width="{WIDTH - 20}" height="{HEIGHT - 20}" rx="10" fill="none" stroke="{accent_color}" stroke-opacity="0.14" stroke-width="1" />
 
   <!-- 2. RADAR HOLOGRÁFICO ATRÁS DO TUX (COM ROTAÇÃO SINCRONIZADA) -->
   <g>
     <circle cx="412" cy="320" r="108" fill="#071226" fill-opacity="0.65" stroke="#1e3a8a" stroke-width="1.2" />
-    <circle cx="412" cy="320" r="92" fill="none" stroke="#00e5ff" stroke-opacity="0.25" stroke-width="1.2" stroke-dasharray="6 8" transform="rotate({radar_rot:.1f} 412 320)" />
+    <circle cx="412" cy="320" r="92" fill="none" stroke="{radar_alert_stroke}" stroke-opacity="0.25" stroke-width="1.2" stroke-dasharray="6 8" transform="rotate({radar_rot:.1f} 412 320)" />
     <circle cx="412" cy="320" r="74" fill="none" stroke="#1d4ed8" stroke-opacity="0.30" stroke-width="1" />
     <!-- Sombra de base do Tux -->
     <ellipse cx="412" cy="402" rx="68" ry="14" fill="#020617" opacity="0.85" />
@@ -392,36 +448,39 @@ def make_frame_svg(frame: int, tux_uri: str) -> str:
   <!-- 6. NÚCLEO DE IA / OLHO BIOMECÂNICO (DIREITA) -->
   <g id="ai-core">
     <!-- Halo externo e base do núcleo -->
-    <circle cx="{cx}" cy="{cy}" r="88" fill="#050b16" stroke="#1e293b" stroke-width="6" filter="url(#cyanGlowSubtle)" />
-    <circle cx="{cx}" cy="{cy}" r="82" fill="none" stroke="#00e5ff" stroke-width="2" stroke-opacity="0.75" />
+    <circle cx="{cx}" cy="{cy}" r="88" fill="#050b16" stroke="#1e293b" stroke-width="6" filter="{accent_glow_subtle}" />
+    <circle cx="{cx}" cy="{cy}" r="82" fill="none" stroke="{ring_color}" stroke-width="2" stroke-opacity="0.85" />
 
-    <!-- 4 Nós Cardeais Brilhantes -->
-    <circle cx="{cx}" cy="{cy - 82}" r="4.5" fill="#00e5ff" filter="url(#cyanGlow)" />
-    <circle cx="{cx}" cy="{cy + 82}" r="4.5" fill="#00e5ff" filter="url(#cyanGlow)" />
-    <circle cx="{cx - 82}" cy="{cy}" r="4.5" fill="#00e5ff" filter="url(#cyanGlow)" />
-    <circle cx="{cx + 82}" cy="{cy}" r="4.5" fill="#00e5ff" filter="url(#cyanGlow)" />
+    <!-- 4 Nós Cardeais Brilhantes (Reativos ao Alerta) -->
+    <circle cx="{cx}" cy="{cy - 82}" r="4.5" fill="{accent_color}" filter="{accent_glow}" />
+    <circle cx="{cx}" cy="{cy + 82}" r="4.5" fill="{accent_color}" filter="{accent_glow}" />
+    <circle cx="{cx - 82}" cy="{cy}" r="4.5" fill="{accent_color}" filter="{accent_glow}" />
+    <circle cx="{cx + 82}" cy="{cy}" r="4.5" fill="{accent_color}" filter="{accent_glow}" />
 
     <!-- Anéis Concêntricos Mecânicos com Rotação Oposta -->
     <circle cx="{cx}" cy="{cy}" r="68" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-dasharray="36 14 12 14" transform="rotate({rot_cw:.1f} {cx} {cy})" />
-    <circle cx="{cx}" cy="{cy}" r="55" fill="none" stroke="#00e5ff" stroke-width="2" stroke-dasharray="50 18" transform="rotate({rot_ccw:.1f} {cx} {cy})" filter="url(#cyanGlowSubtle)" />
+    <circle cx="{cx}" cy="{cy}" r="55" fill="none" stroke="{ring_color}" stroke-width="2" stroke-dasharray="50 18" transform="rotate({rot_ccw:.1f} {cx} {cy})" filter="{accent_glow_subtle}" />
     <circle cx="{cx}" cy="{cy}" r="42" fill="#030811" stroke="#38bdf8" stroke-width="1.8" stroke-opacity="0.8" />
-    <circle cx="{cx}" cy="{cy}" r="30" fill="#08172e" stroke="#00e5ff" stroke-width="1.5" />
+    <circle cx="{cx}" cy="{cy}" r="30" fill="#08172e" stroke="{ring_color}" stroke-width="1.5" />
 
-    <!-- Pupila / Lente Óptica com Varredura Ativa -->
+    <!-- Pupila / Lente Óptica com Varredura Ativa e Mudança de Cor (Ciano <-> Vermelho) -->
     <g transform="translate({eye_dx:.1f}, {eye_dy:.1f})">
-      <circle cx="{cx}" cy="{cy}" r="18" fill="#020617" stroke="#00e5ff" stroke-width="2" filter="url(#cyanGlowSubtle)" />
-      <!-- Crescente Ciano Luminoso -->
-      <path d="M {cx - 2},{cy - 11} A 11,11 0 1,1 {cx - 2},{cy + 11} A 8,9 0 1,0 {cx - 2},{cy - 11} Z" fill="#38bdf8" filter="url(#cyanGlow)" />
-      <!-- Reflexo da Lente -->
+      <!-- Halo interno da pupila -->
+      <circle cx="{cx}" cy="{cy}" r="16" fill="{pupil_halo_color}" opacity="{pupil_halo_op}" filter="{accent_glow}" />
+      <circle cx="{cx}" cy="{cy}" r="18" fill="#020617" stroke="{ring_color}" stroke-width="2" filter="{accent_glow_subtle}" />
+      <!-- Crescente Luminoso (Vermelho no modo alerta / Ciano no padrão) -->
+      <path d="M {cx - 2},{cy - 11} A 11,11 0 1,1 {cx - 2},{cy + 11} A 8,9 0 1,0 {cx - 2},{cy - 11} Z" fill="{crescent_color}" filter="{accent_glow}" />
+      <!-- Reflexo de Lente Especular Branco -->
       <circle cx="{cx - 6}" cy="{cy - 4}" r="3.2" fill="#ffffff" opacity="0.95" />
     </g>
   </g>
 
   <!-- 7. TIPOGRAFIA E PAINEL HUD (CANTO SUPERIOR ESQUERDO) -->
   <g transform="translate(68, 62)">
-    <!-- Tag de Telemetria Superior -->
+    <!-- Tag de Telemetria Superior (Indica Alerta Dinâmico) -->
+    <circle cx="-10" cy="-3.5" r="3" fill="{accent_color}" filter="{accent_glow}" />
     <text x="0" y="0" fill="#38bdf8" font-size="10.5" font-weight="600" letter-spacing="2.5" class="font-mono" opacity="0.8">
-      // SYS.IDENTITY : UFRN.ECT
+      // SYS.IDENTITY : UFRN.ECT{hud_alert_tag}
     </text>
 
     <!-- Nome Principal com Destaque Neon -->
@@ -467,7 +526,7 @@ def generate_all() -> None:
     svg_files = []
     png_files = []
 
-    print(f"[*] Gerando {FRAME_COUNT} frames vetoriais com movimento contínuo dos braços...")
+    print(f"[*] Gerando {FRAME_COUNT} frames vetoriais (incluindo Alerta Vermelho nos frames 8-13)...")
     for i in range(FRAME_COUNT):
         frame_svg_code = make_frame_svg(i, tux_uri)
         svg_file = FRAMES_DIR / f"frame_{i:02d}.svg"
@@ -489,24 +548,31 @@ def generate_all() -> None:
         for f in concurrent.futures.as_completed(futures):
             f.result()
 
-    print("[*] Montando GIF animado otimizado...")
-    loaded_frames = [
-        Image.open(p).convert("RGB").convert("P", palette=Image.Palette.ADAPTIVE, colors=128)
-        for p in png_files
+    print("[*] Montando GIF animado com paleta unificada (Ciano + Alerta Vermelho)...")
+    rgb_frames = [Image.open(p).convert("RGB") for p in png_files]
+
+    # Amostra o frame normal (0) e o frame de alerta máximo (10) para compor a paleta perfeita
+    palette_sample = Image.new("RGB", (1200, 960))
+    palette_sample.paste(rgb_frames[0], (0, 0))
+    palette_sample.paste(rgb_frames[10], (0, 480))
+    unified_palette = palette_sample.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+
+    quantized_frames = [
+        f.quantize(palette=unified_palette, dither=Image.Dither.NONE)
+        for f in rgb_frames
     ]
 
-    loaded_frames[0].save(
+    quantized_frames[0].save(
         OUTPUT_GIF,
         save_all=True,
-        append_images=loaded_frames[1:],
+        append_images=quantized_frames[1:],
         duration=DURATION_MS,
         loop=0,
-        optimize=True,
         disposal=2,
     )
 
     # Salva preview estático em PNG de alta resolução
-    Image.open(png_files[0]).save(OUTPUT_PNG)
+    rgb_frames[0].save(OUTPUT_PNG)
 
     # Limpeza dos frames temporários
     shutil.rmtree(FRAMES_DIR)
