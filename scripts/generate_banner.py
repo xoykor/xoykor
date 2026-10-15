@@ -1,24 +1,36 @@
 #!/usr/bin/env python3
 """
-Gerador do Banner Exuberante para o GitHub Profile (xoykor)
-Lê assets/tux.svg e gera assets/profile-banner.svg com estética Sci-Fi/HUD,
-tentáculos biomecânicos em camadas 3D, filtros neon e animações CSS nativas.
+Gerador do Banner Exuberante Animado para o GitHub Profile (xoykor)
+Lê assets/tux.svg e gera:
+  - assets/profile-banner.gif (Banner animado com tentáculos em movimento suave)
+  - assets/profile-banner.svg (Versão vetorial do frame base)
+  - assets/profile-banner.png (Preview estático em alta resolução)
 """
 
 import base64
+import concurrent.futures
 import math
+import shutil
+import subprocess
 from pathlib import Path
+from PIL import Image
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-TUX_PATH = ROOT_DIR / "assets" / "tux.svg"
-OUTPUT_SVG = ROOT_DIR / "assets" / "profile-banner.svg"
+ASSETS_DIR = ROOT_DIR / "assets"
+TUX_PATH = ASSETS_DIR / "tux.svg"
+OUTPUT_GIF = ASSETS_DIR / "profile-banner.gif"
+OUTPUT_SVG = ASSETS_DIR / "profile-banner.svg"
+OUTPUT_PNG = ASSETS_DIR / "profile-banner.png"
+FRAMES_DIR = ASSETS_DIR / ".banner_frames"
 
 WIDTH = 1200
 HEIGHT = 480
+FRAME_COUNT = 24
+DURATION_MS = 125  # ~8 FPS para animação fluida e leve em GIF
 
 
 def load_tux_data_uri(svg_path: Path) -> str:
-    """Embute o tux.svg em base64 para funcionar dentro da tag <img> do GitHub."""
+    """Embute o tux.svg em base64 para funcionar perfeitamente em qualquer renderizador."""
     if svg_path.exists():
         raw_bytes = svg_path.read_bytes()
         b64 = base64.b64encode(raw_bytes).decode("utf-8")
@@ -27,7 +39,7 @@ def load_tux_data_uri(svg_path: Path) -> str:
 
 
 def bezier_point(t: float, p0: tuple, p1: tuple, p2: tuple, p3: tuple) -> tuple:
-    """Calcula um ponto (x, y) em uma curva de Bézier cúbica."""
+    """Calcula ponto (x, y) em uma curva de Bézier cúbica."""
     u = 1 - t
     x = (u**3) * p0[0] + 3 * (u**2) * t * p1[0] + 3 * u * (t**2) * p2[0] + (t**3) * p3[0]
     y = (u**3) * p0[1] + 3 * (u**2) * t * p1[1] + 3 * u * (t**2) * p2[1] + (t**3) * p3[1]
@@ -35,7 +47,7 @@ def bezier_point(t: float, p0: tuple, p1: tuple, p2: tuple, p3: tuple) -> tuple:
 
 
 def bezier_tangent_angle(t: float, p0: tuple, p1: tuple, p2: tuple, p3: tuple) -> float:
-    """Calcula o ângulo tangente (em graus) no ponto t da curva de Bézier."""
+    """Calcula o ângulo tangente em graus no ponto t da curva de Bézier cúbica."""
     u = 1 - t
     dx = 3 * (u**2) * (p1[0] - p0[0]) + 6 * u * t * (p2[0] - p1[0]) + 3 * (t**2) * (p3[0] - p2[0])
     dy = 3 * (u**2) * (p1[1] - p0[1]) + 6 * u * t * (p2[1] - p1[1]) + 3 * (t**2) * (p3[1] - p2[1])
@@ -50,12 +62,11 @@ def build_tentacle(
     p3: tuple,
     thickness: float = 20,
     opacity: float = 1.0,
-    pulse_delay: float = 0.0,
+    pulse_offset: float = 0.0,
 ) -> str:
-    """Gera um tentáculo mecânico segmentado com sombra, relevo metálico e pulso neon."""
+    """Gera o corpo do tentáculo mecânico segmentado com sombra, relevo e pulso neon."""
     path_d = f"M {p0[0]:.1f},{p0[1]:.1f} C {p1[0]:.1f},{p1[1]:.1f} {p2[0]:.1f},{p2[1]:.1f} {p3[0]:.1f},{p3[1]:.1f}"
 
-    # Pontos de brilho especular nos segmentos
     highlights = []
     steps = 14
     for i in range(1, steps):
@@ -83,20 +94,29 @@ def build_tentacle(
         <path d="{path_d}" fill="none" stroke="#0b1729" stroke-width="{thickness}" stroke-linecap="butt" stroke-dasharray="4 22" />
         <!-- Trilha interna escura -->
         <path d="{path_d}" fill="none" stroke="#10233f" stroke-width="{thickness * 0.35:.1f}" stroke-linecap="round" />
-        <!-- Feixe de energia ciano animado -->
-        <path d="{path_d}" fill="none" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="14 90" class="energy-pulse" style="animation-delay: {pulse_delay}s;" filter="url(#cyanGlow)" />
-        <!-- Pontos de reflexo metálico -->
+        <!-- Feixe de energia ciano pulsante -->
+        <path d="{path_d}" fill="none" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="14 90" stroke-dashoffset="-{pulse_offset:.1f}" filter="url(#cyanGlow)" />
+        <!-- Pontos de reflexo metálico calculados dinamicamente na curva -->
         {highlights_svg}
       </g>
     """
 
 
-def build_claw(x: float, y: float, angle: float, scale: float = 1.0, tool: str = "none") -> str:
+def build_claw(
+    x: float,
+    y: float,
+    angle: float,
+    scale: float = 1.0,
+    tool: str = "none",
+    tool_anim: float = 0.0,
+) -> str:
     """Desenha a garra robótica articulada e a ferramenta acoplada na ponta."""
     tool_svg = ""
     if tool == "screwdriver":
-        # Chave de fenda amarela/laranja apontando para baixo/esquerda + faíscas
-        tool_svg = """
+        # Chave de fenda amarela com faíscas animadas
+        spark_r = 2.2 + 1.2 * math.sin(tool_anim)
+        spark_op = 0.4 + 0.6 * math.sin(tool_anim) ** 2
+        tool_svg = f"""
         <g transform="rotate(15) translate(16, 0)">
           <!-- Haste metálica -->
           <rect x="28" y="-2.2" width="38" height="4.4" rx="1.5" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.5" />
@@ -106,13 +126,14 @@ def build_claw(x: float, y: float, angle: float, scale: float = 1.0, tool: str =
           <line x1="8" y1="-5" x2="22" y2="-5" stroke="#fef08a" stroke-width="1.8" stroke-linecap="round" opacity="0.8" />
           <line x1="8" y1="0" x2="22" y2="0" stroke="#78350f" stroke-width="1.8" stroke-linecap="round" opacity="0.5" />
           <!-- Faíscas de energia na ponta -->
-          <circle cx="77" cy="0" r="2.5" fill="#00e5ff" class="spark-blink" filter="url(#cyanGlow)" />
+          <circle cx="77" cy="0" r="{spark_r:.1f}" fill="#00e5ff" opacity="{spark_op:.2f}" filter="url(#cyanGlow)" />
         </g>
         """
     elif tool == "paper":
-        # Folha de código / documento flutuante no topo direito
-        tool_svg = """
-        <g transform="rotate(20) translate(12, -18)" class="float-slow">
+        # Folha de código / documento com leve flutuação
+        paper_rot = 20 + 4 * math.sin(tool_anim)
+        tool_svg = f"""
+        <g transform="rotate({paper_rot:.1f}) translate(12, -18)">
           <path d="M 0,0 L 36,-6 L 44,36 L 8,42 Z" fill="#f8fafc" stroke="#0f172a" stroke-width="2" filter="url(#cyanGlowSubtle)" />
           <path d="M 6,6 L 30,2 L 36,32 L 12,36 Z" fill="#e2e8f0" opacity="0.4" />
           <!-- Linhas de código estilizadas -->
@@ -123,11 +144,13 @@ def build_claw(x: float, y: float, angle: float, scale: float = 1.0, tool: str =
         </g>
         """
     elif tool == "bulb":
-        # Lâmpada de ideia com brilho dourado intenso no canto inferior direito
-        tool_svg = """
+        # Lâmpada de ideia com pulso de brilho dourado
+        halo_r = 26 + 6 * math.sin(tool_anim)
+        halo_op = 0.40 + 0.25 * math.sin(tool_anim)
+        tool_svg = f"""
         <g transform="rotate(-15) translate(14, 0)">
-          <!-- Halo de luz dourada -->
-          <circle cx="34" cy="0" r="26" fill="url(#bulbHalo)" class="bulb-pulse" />
+          <!-- Halo de luz dourada pulsante -->
+          <circle cx="34" cy="0" r="{halo_r:.1f}" fill="url(#bulbHalo)" opacity="{halo_op:.2f}" />
           <!-- Base de rosca metálica -->
           <rect x="8" y="-6" width="10" height="12" rx="2" fill="#94a3b8" stroke="#0f172a" stroke-width="1.8" />
           <line x1="11" y1="-6" x2="11" y2="6" stroke="#334155" stroke-width="1.5" />
@@ -157,35 +180,84 @@ def build_claw(x: float, y: float, angle: float, scale: float = 1.0, tool: str =
     """
 
 
-def generate_banner() -> None:
-    tux_uri = load_tux_data_uri(TUX_PATH)
-
+def make_frame_svg(frame: int, tux_uri: str) -> str:
+    """Gera o código SVG para um frame específico com cinemática completa dos tentáculos."""
     # Coordenadas do Núcleo Robótico (Direita)
     cx, cy = 875, 255
+    phase_base = 2 * math.pi * frame / FRAME_COUNT
 
-    # Definição dos 6 tentáculos: (id, p0, p1, p2, p3, espessura, opacidade, delay, ferramenta)
-    tentacles_data = [
-        # 1. Tentáculo de fundo (passa por trás do Tux)
-        ("t-back-mid", (cx - 45, cy + 10), (690, 275), (550, 315), (435, 345), 17, 0.60, 0.8, "none"),
-        # 2. Tentáculo superior direito (segurando o código/papel)
-        ("t-top-right", (cx + 40, cy - 40), (960, 175), (1025, 130), (1070, 95), 18, 0.90, 0.3, "paper"),
-        # 3. Tentáculo inferior direito (segurando a lâmpada)
-        ("t-bot-right", (cx + 45, cy + 35), (965, 310), (1015, 360), (1055, 405), 18, 0.90, 1.4, "bulb"),
-        # 4. Tentáculo superior esquerdo (curvado abaixo do subtítulo para NÃO cobrir o texto!)
-        ("t-top-left", (cx - 35, cy - 42), (710, 155), (535, 185), (415, 205), 20, 0.95, 0.0, "none"),
-        # 5. Tentáculo médio esquerdo (segurando a chave de fenda)
-        ("t-mid-left", (cx - 50, cy - 18), (725, 200), (635, 225), (555, 265), 19, 1.00, 0.6, "screwdriver"),
-        # 6. Tentáculo inferior esquerdo (passando abaixo dos pés do Tux)
-        ("t-bot-left", (cx - 40, cy + 35), (675, 340), (505, 395), (345, 425), 20, 1.00, 1.1, "none"),
+    # --- Ângulos de Rotação e Cinemática ---
+    rot_cw = (frame / FRAME_COUNT) * 360.0
+    rot_ccw = -(frame / FRAME_COUNT) * 360.0
+    radar_rot = (frame / FRAME_COUNT) * 360.0
+
+    # Movimento de varredura da pupila / olho óptico
+    eye_dx = -3 + 5.0 * math.sin(phase_base)
+    eye_dy = 2.8 * math.cos(phase_base)
+
+    # Piscar do cursor do terminal no HUD
+    cursor_op = "1" if (frame % 12) < 7 else "0.1"
+
+    # --- Cinemática dos 6 Tentáculos ---
+    # 1. Tentáculo de fundo (passa por trás do Tux, ondulando)
+    cyc1 = phase_base + 0.8
+    t1_p0 = (cx - 45, cy + 10)
+    t1_p3 = (435 + 24 * math.cos(cyc1), 345 + 18 * math.sin(cyc1))
+    t1_p1 = (690 + 20 * math.sin(cyc1), 275 + 15 * math.cos(cyc1))
+    t1_p2 = (550 - 15 * math.cos(cyc1), 315 + 22 * math.sin(cyc1))
+
+    # 2. Tentáculo superior direito (segurando o código/papel, flutuando suavemente)
+    cyc2 = phase_base + 2.0
+    t2_p0 = (cx + 40, cy - 40)
+    t2_p3 = (1070 + 16 * math.cos(cyc2), 95 + 18 * math.sin(cyc2))
+    t2_p1 = (960 + 12 * math.sin(cyc2), 175 - 10 * math.cos(cyc2))
+    t2_p2 = (1025 + 14 * math.cos(cyc2), 130 + 12 * math.sin(cyc2))
+
+    # 3. Tentáculo inferior direito (segurando a lâmpada com brilho pulsante)
+    cyc3 = phase_base + 3.8
+    t3_p0 = (cx + 45, cy + 35)
+    t3_p3 = (1055 + 18 * math.cos(cyc3), 405 + 14 * math.sin(cyc3))
+    t3_p1 = (965 + 14 * math.sin(cyc3), 310 + 12 * math.cos(cyc3))
+    t3_p2 = (1015 - 12 * math.cos(cyc3), 360 + 16 * math.sin(cyc3))
+
+    # 4. Tentáculo superior esquerdo (curvado abaixo do texto, ondulando em direção à cabeça do Tux)
+    cyc4 = phase_base + 1.2
+    t4_p0 = (cx - 35, cy - 42)
+    t4_p3 = (415 + 22 * math.cos(cyc4), 210 + 16 * math.sin(cyc4))
+    t4_p1 = (710 + 20 * math.cos(cyc4), 160 + 14 * math.sin(cyc4))
+    t4_p2 = (535 - 18 * math.sin(cyc4), 190 + 15 * math.cos(cyc4))
+
+    # 5. Tentáculo médio esquerdo (segurando a chave de fenda e alcançando o Tux)
+    cyc5 = phase_base + 0.5
+    reach = 0.5 - 0.5 * math.cos(phase_base)  # Movimento de vai-e-vem fluido
+    t5_p0 = (cx - 50, cy - 18)
+    t5_p3 = (565 - 38 * reach, 265 + 18 * math.sin(cyc5))
+    t5_p1 = (725 - 15 * reach + 18 * math.sin(cyc5), 200 + 12 * math.cos(cyc5))
+    t5_p2 = (635 - 28 * reach, 230 + 20 * math.sin(cyc5))
+
+    # 6. Tentáculo inferior esquerdo (passando abaixo dos pés do Tux)
+    cyc6 = phase_base + 4.2
+    t6_p0 = (cx - 40, cy + 35)
+    t6_p3 = (345 + 28 * math.cos(cyc6), 425 + 12 * math.sin(cyc6))
+    t6_p1 = (675 + 22 * math.sin(cyc6), 340 + 15 * math.cos(cyc6))
+    t6_p2 = (505 - 18 * math.cos(cyc6), 395 + 16 * math.sin(cyc6))
+
+    tentacles_specs = [
+        ("t-back-mid", t1_p0, t1_p1, t1_p2, t1_p3, 17, 0.60, (frame * 5.5 + 20) % 104, "none", cyc1),
+        ("t-top-right", t2_p0, t2_p1, t2_p2, t2_p3, 18, 0.90, (frame * 6.0 + 40) % 104, "paper", cyc2),
+        ("t-bot-right", t3_p0, t3_p1, t3_p2, t3_p3, 18, 0.90, (frame * 6.0 + 70) % 104, "bulb", cyc3),
+        ("t-top-left", t4_p0, t4_p1, t4_p2, t4_p3, 20, 0.95, (frame * 6.5 + 0) % 104, "none", cyc4),
+        ("t-mid-left", t5_p0, t5_p1, t5_p2, t5_p3, 19, 1.00, (frame * 7.0 + 50) % 104, "screwdriver", cyc5),
+        ("t-bot-left", t6_p0, t6_p1, t6_p2, t6_p3, 20, 1.00, (frame * 6.2 + 85) % 104, "none", cyc6),
     ]
 
     back_tentacles_svg = []
     front_tentacles_svg = []
 
-    for tid, p0, p1, p2, p3, thick, opac, delay, tool in tentacles_data:
-        t_svg = build_tentacle(tid, p0, p1, p2, p3, thick, opac, delay)
+    for tid, p0, p1, p2, p3, thick, opac, pulse_off, tool, anim_val in tentacles_specs:
+        t_svg = build_tentacle(tid, p0, p1, p2, p3, thick, opac, pulse_off)
         end_angle = bezier_tangent_angle(1.0, p0, p1, p2, p3)
-        c_svg = build_claw(p3[0], p3[1], end_angle, scale=0.95, tool=tool)
+        c_svg = build_claw(p3[0], p3[1], end_angle, scale=0.95, tool=tool, tool_anim=anim_val)
         combined = t_svg + c_svg
         if tid == "t-back-mid":
             back_tentacles_svg.append(combined)
@@ -198,7 +270,7 @@ def generate_banner() -> None:
         else ""
     )
 
-    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}" width="100%" height="100%">
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}" width="{WIDTH}" height="{HEIGHT}">
   <defs>
     <!-- Gradiente de Fundo Sci-Fi Profundo -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -287,60 +359,6 @@ def generate_banner() -> None:
   <style>
     .font-ui {{ font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }}
     .font-mono {{ font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; }}
-
-    .energy-pulse {{
-      animation: pulseFlow 3.2s linear infinite;
-    }}
-    .ring-cw {{
-      transform-origin: {cx}px {cy}px;
-      animation: spinCW 24s linear infinite;
-    }}
-    .ring-ccw {{
-      transform-origin: {cx}px {cy}px;
-      animation: spinCCW 16s linear infinite;
-    }}
-    .radar-spin {{
-      transform-origin: 412px 320px;
-      animation: spinCW 32s linear infinite;
-    }}
-    .eye-scan {{
-      animation: eyeLook 6s ease-in-out infinite;
-    }}
-    .cursor-blink {{
-      animation: blink 1.1s step-end infinite;
-    }}
-    .spark-blink {{
-      animation: blink 0.8s ease-in-out infinite alternate;
-    }}
-    .bulb-pulse {{
-      animation: glowPulse 2.8s ease-in-out infinite alternate;
-    }}
-
-    @keyframes pulseFlow {{
-      from {{ stroke-dashoffset: 208; }}
-      to {{ stroke-dashoffset: 0; }}
-    }}
-    @keyframes spinCW {{
-      from {{ transform: rotate(0deg); }}
-      to {{ transform: rotate(360deg); }}
-    }}
-    @keyframes spinCCW {{
-      from {{ transform: rotate(360deg); }}
-      to {{ transform: rotate(0deg); }}
-    }}
-    @keyframes eyeLook {{
-      0%, 100% {{ transform: translate(0px, 0px); }}
-      35% {{ transform: translate(-5px, -2px); }}
-      70% {{ transform: translate(-2px, 3px); }}
-    }}
-    @keyframes blink {{
-      0%, 100% {{ opacity: 1; }}
-      50% {{ opacity: 0.15; }}
-    }}
-    @keyframes glowPulse {{
-      from {{ opacity: 0.55; }}
-      to {{ opacity: 1; }}
-    }}
   </style>
 
   <!-- 1. FUNDO E GRADE SCI-FI -->
@@ -352,10 +370,10 @@ def generate_banner() -> None:
   <!-- Moldura Externa HUD Sutil -->
   <rect x="10" y="10" width="{WIDTH - 20}" height="{HEIGHT - 20}" rx="10" fill="none" stroke="#00e5ff" stroke-opacity="0.14" stroke-width="1" />
 
-  <!-- 2. RADAR HOLOGRÁFICO ATRÁS DO TUX -->
+  <!-- 2. RADAR HOLOGRÁFICO ATRÁS DO TUX (COM ROTAÇÃO SINCRONIZADA) -->
   <g>
     <circle cx="412" cy="320" r="108" fill="#071226" fill-opacity="0.65" stroke="#1e3a8a" stroke-width="1.2" />
-    <circle cx="412" cy="320" r="92" fill="none" stroke="#00e5ff" stroke-opacity="0.25" stroke-width="1.2" stroke-dasharray="6 8" class="radar-spin" />
+    <circle cx="412" cy="320" r="92" fill="none" stroke="#00e5ff" stroke-opacity="0.25" stroke-width="1.2" stroke-dasharray="6 8" transform="rotate({radar_rot:.1f} 412 320)" />
     <circle cx="412" cy="320" r="74" fill="none" stroke="#1d4ed8" stroke-opacity="0.30" stroke-width="1" />
     <!-- Sombra de base do Tux -->
     <ellipse cx="412" cy="402" rx="68" ry="14" fill="#020617" opacity="0.85" />
@@ -383,23 +401,23 @@ def generate_banner() -> None:
     <circle cx="{cx - 82}" cy="{cy}" r="4.5" fill="#00e5ff" filter="url(#cyanGlow)" />
     <circle cx="{cx + 82}" cy="{cy}" r="4.5" fill="#00e5ff" filter="url(#cyanGlow)" />
 
-    <!-- Anéis Concêntricos Animados -->
-    <circle cx="{cx}" cy="{cy}" r="68" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-dasharray="36 14 12 14" class="ring-cw" />
-    <circle cx="{cx}" cy="{cy}" r="55" fill="none" stroke="#00e5ff" stroke-width="2" stroke-dasharray="50 18" class="ring-ccw" filter="url(#cyanGlowSubtle)" />
+    <!-- Anéis Concêntricos Mecânicos com Rotação Oposta -->
+    <circle cx="{cx}" cy="{cy}" r="68" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-dasharray="36 14 12 14" transform="rotate({rot_cw:.1f} {cx} {cy})" />
+    <circle cx="{cx}" cy="{cy}" r="55" fill="none" stroke="#00e5ff" stroke-width="2" stroke-dasharray="50 18" transform="rotate({rot_ccw:.1f} {cx} {cy})" filter="url(#cyanGlowSubtle)" />
     <circle cx="{cx}" cy="{cy}" r="42" fill="#030811" stroke="#38bdf8" stroke-width="1.8" stroke-opacity="0.8" />
     <circle cx="{cx}" cy="{cy}" r="30" fill="#08172e" stroke="#00e5ff" stroke-width="1.5" />
 
-    <!-- Pupila / Lente Óptica Animada -->
-    <g class="eye-scan">
-      <circle cx="{cx - 3}" cy="{cy}" r="18" fill="#020617" stroke="#00e5ff" stroke-width="2" filter="url(#cyanGlowSubtle)" />
+    <!-- Pupila / Lente Óptica com Varredura Ativa -->
+    <g transform="translate({eye_dx:.1f}, {eye_dy:.1f})">
+      <circle cx="{cx}" cy="{cy}" r="18" fill="#020617" stroke="#00e5ff" stroke-width="2" filter="url(#cyanGlowSubtle)" />
       <!-- Crescente Ciano Luminoso -->
-      <path d="M {cx - 5},{cy - 11} A 11,11 0 1,1 {cx - 5},{cy + 11} A 8,9 0 1,0 {cx - 5},{cy - 11} Z" fill="#38bdf8" filter="url(#cyanGlow)" />
+      <path d="M {cx - 2},{cy - 11} A 11,11 0 1,1 {cx - 2},{cy + 11} A 8,9 0 1,0 {cx - 2},{cy - 11} Z" fill="#38bdf8" filter="url(#cyanGlow)" />
       <!-- Reflexo da Lente -->
-      <circle cx="{cx - 9}" cy="{cy - 4}" r="3.2" fill="#ffffff" opacity="0.95" />
+      <circle cx="{cx - 6}" cy="{cy - 4}" r="3.2" fill="#ffffff" opacity="0.95" />
     </g>
   </g>
 
-  <!-- 7. TIPOGRAFIA E PAINEL HUD (CANTO SUPERIOR ESQUERDO — 100% LIVRE DE COLISÕES) -->
+  <!-- 7. TIPOGRAFIA E PAINEL HUD (CANTO SUPERIOR ESQUERDO) -->
   <g transform="translate(68, 62)">
     <!-- Tag de Telemetria Superior -->
     <text x="0" y="0" fill="#38bdf8" font-size="10.5" font-weight="600" letter-spacing="2.5" class="font-mono" opacity="0.8">
@@ -421,7 +439,7 @@ def generate_banner() -> None:
 
     <!-- Subtítulo + Cursor de Terminal Piscando -->
     <text x="0" y="108" fill="#94a3b8" font-size="14.5" font-weight="400" class="font-mono">
-      Explorando tecnologia e descobrindo novos caminhos.<tspan fill="#00e5ff" font-weight="700" class="cursor-blink">_</tspan>
+      Explorando tecnologia e descobrindo novos caminhos.<tspan fill="#00e5ff" font-weight="700" opacity="{cursor_op}">_</tspan>
     </text>
 
     <!-- Barra de Progresso / Energia Ciano Brilhante -->
@@ -432,10 +450,71 @@ def generate_banner() -> None:
 </svg>
 """
 
-    OUTPUT_SVG.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_SVG.write_text(svg_content, encoding="utf-8")
-    print(f"[OK] Banner gerado com sucesso em: {OUTPUT_SVG}")
+
+def convert_svg_to_png(svg_path: Path, png_path: Path) -> None:
+    """Renderiza um arquivo SVG em PNG via rsvg-convert mantendo máxima fidelidade vetorial."""
+    subprocess.run(
+        ["rsvg-convert", "-w", str(WIDTH), "-h", str(HEIGHT), str(svg_path), "-o", str(png_path)],
+        check=True,
+    )
+
+
+def generate_all() -> None:
+    print("[*] Carregando Tux SVG...")
+    tux_uri = load_tux_data_uri(TUX_PATH)
+
+    FRAMES_DIR.mkdir(parents=True, exist_ok=True)
+    svg_files = []
+    png_files = []
+
+    print(f"[*] Gerando {FRAME_COUNT} frames vetoriais com movimento contínuo dos braços...")
+    for i in range(FRAME_COUNT):
+        frame_svg_code = make_frame_svg(i, tux_uri)
+        svg_file = FRAMES_DIR / f"frame_{i:02d}.svg"
+        png_file = FRAMES_DIR / f"frame_{i:02d}.png"
+        svg_file.write_text(frame_svg_code, encoding="utf-8")
+        svg_files.append(svg_file)
+        png_files.append(png_file)
+
+        # Salva o frame 0 como a versão SVG estática principal
+        if i == 0:
+            OUTPUT_SVG.write_text(frame_svg_code, encoding="utf-8")
+
+    print("[*] Renderizando frames PNG em paralelo...")
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [
+            executor.submit(convert_svg_to_png, svg_p, png_p)
+            for svg_p, png_p in zip(svg_files, png_files)
+        ]
+        for f in concurrent.futures.as_completed(futures):
+            f.result()
+
+    print("[*] Montando GIF animado otimizado...")
+    loaded_frames = [
+        Image.open(p).convert("RGB").convert("P", palette=Image.Palette.ADAPTIVE, colors=128)
+        for p in png_files
+    ]
+
+    loaded_frames[0].save(
+        OUTPUT_GIF,
+        save_all=True,
+        append_images=loaded_frames[1:],
+        duration=DURATION_MS,
+        loop=0,
+        optimize=True,
+        disposal=2,
+    )
+
+    # Salva preview estático em PNG de alta resolução
+    Image.open(png_files[0]).save(OUTPUT_PNG)
+
+    # Limpeza dos frames temporários
+    shutil.rmtree(FRAMES_DIR)
+
+    print(f"[OK] GIF gerado com sucesso em: {OUTPUT_GIF}")
+    print(f"[OK] SVG gerado com sucesso em: {OUTPUT_SVG}")
+    print(f"[OK] PNG gerado com sucesso em: {OUTPUT_PNG}")
 
 
 if __name__ == "__main__":
-    generate_banner()
+    generate_all()

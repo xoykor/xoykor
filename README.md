@@ -1,6 +1,5 @@
 <div align="center">
-  <!-- Usa o SVG vetorial animado (60 FPS, nitidez máxima e brilho neon) -->
-  <img src="./assets/profile-banner.svg" width="100%" alt="Banner Fernando Victor Oliveira de Araujo - Ciência e Tecnologia UFRN" />
+  <img src="./assets/profile-banner.gif" width="100%" alt="Banner Fernando Victor Oliveira de Araujo - Ciência e Tecnologia UFRN" />
 </div>
 
 <br/>
